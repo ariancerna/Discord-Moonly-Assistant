@@ -1,0 +1,26 @@
+panels:
+  hwid_reset:
+    apps:
+      KeyAuth AIO:
+        seller_key: d6be9fa1d88b01e53fc5cb238e2ece23
+      Password Changer:
+        seller_key: 712385f83235762ab08444e77bc4b3ca
+      SellAuth AIO:
+        seller_key: 938cfbf6fccf0a4b05af05ce5db26063
+      Server Cloner:
+        seller_key: 3de6130612318618008328cdd96682c8
+      Status Rotator:
+        seller_key: 5ffdce7c1f6c778669406d80b50ca492
+      Token Checker:
+        seller_key: 6452d6260362075724bd09c0d685e1eb
+    channel_id: 0
+    log_channel_id: 1408893713513582642
+    message_id: 0
+  showcase:
+    apps:
+      Boost Tool: https://www.youtube.com/watch?v=du1CDrTHSNA
+      Server Cloner: https://www.youtube.com/watch?v=JRn3lc4Oyks
+    channel_id: 0
+    message_id: 0
+permissions:
+  allowed_role_id: 1159641262077509642

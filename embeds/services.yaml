@@ -1,0 +1,25 @@
+CheteoConsola:
+  title: ""
+  description: |
+    # __Requerimientos para el Cheteo__
+    - **Xbox:** Necesitamos correo, contraseña, país y ciudad de la cuenta. Desactiva la autenticación de dos pasos (2FA).
+    - **PlayStation:** Necesitamos correo, contraseña y código de seguridad de la cuenta. Activa la autenticación (2FA) para enviarnos los códigos.
+    # __Seguridad al comprar en Moonly__
+    - En Moonly, la seguridad de tus datos es nuestra prioridad. Una vez finalizado el proceso, eres libre de cambiar tus credenciales de inicio de sesión para mayor tranquilidad.
+    
+    -# El tiempo del cheteo dependerá de la disponibilidad de nuestro equipo, por lo que puede tardar desde algunos días hasta varias semanas según la cantidad de pedidos. Al realizar el pago, aceptas y comprendes este término.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+CheteoPC:
+  title: ""
+  description: |
+    # __Requerimientos para el Cheteo__
+    - **Steam:** Necesitamos el acceso a tu cuenta de Steam y Rockstar Games.
+    - **Epic Games:** Necesitamos el acceso a tu cuenta de Epic Games y Rockstar Games.
+    - **Rockstar Games:** Solo necesitamos el acceso a tu cuenta de Rockstar Games.
+    - **Xbox Gamepass PC:** Necesitamos el acceso a tu cuenta de Microsoft y Rockstar Games.
+    # __Seguridad al comprar en Moonly__
+    - En Moonly, la seguridad de tus datos es nuestra prioridad. Una vez finalizado el proceso, eres libre de cambiar tus credenciales de inicio de sesión para mayor tranquilidad.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"

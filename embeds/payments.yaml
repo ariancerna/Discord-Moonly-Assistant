@@ -1,0 +1,286 @@
+PayPal:
+  title: ""
+  description: |
+    ## 💳 **__Pago con PayPal__**
+    
+    > Realiza tu pago de forma segura y rápida a través de PayPal. Asegúrate de seguir las instrucciones cuidadosamente para evitar retrasos en tu pedido.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Haz clic en el enlace de PayPal proporcionado abajo.
+    > 2. **Selecciona la opción de cubrir comisiones** (Este paso es fundamental).
+    > 3. Completa el pago según el monto acordado.
+    > 4. Toma una captura de pantalla del comprobante.
+    
+    **📸 Requisitos del Comprobante**
+    > La captura debe mostrar claramente:
+    > - ⏰ Hora y fecha de la transacción
+    > - 💵 Monto enviado
+    > - ✅ Estado de la transacción completada
+    
+    **🔗 Enlace de Pago**
+    > [Haz clic aquí para pagar con PayPal](https://links.moonlygg.com/paypal-snifex)
+    
+    **⚠️ ¡Importante!**
+    > Si no seleccionas la opción de cubrir comisiones, el proceso no podrá continuar y tu pedido se retrasará.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+  image: "https://i.imgur.com/X5xRTy3.png"
+
+Binance:
+  title: ""
+  description: |
+    ## 🪙 **__Pago con Binance__**
+    
+    > Realiza tu pago de forma rápida y segura utilizando nuestra ID de Binance. Este método es ideal para transacciones con criptomonedas.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Abre tu aplicación de **Binance**.
+    > 2. Selecciona la opción de **enviar/transferir**.
+    > 3. Ingresa nuestro **Binance ID** proporcionado abajo.
+    > 4. Completa el pago según el monto acordado.
+    > 5. Toma una captura del comprobante de transacción.
+    
+    **🆔 Binance ID de Moonly**
+    ```961837376```
+    
+    **📸 Envío del Comprobante**
+    > Una vez realizado el pago, envíanos la captura de pantalla para verificar tu transacción y proceder con tu pedido.
+    
+    **⚠️ Verificación**
+    > Asegúrate de que la captura muestre claramente el monto, fecha y estado de la transacción.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+TransferenciaChile:
+  title: ""
+  description: |
+    ## 🇨🇱 **__Pago mediante Transferencia - Chile__**
+    
+    > Realiza tu pago por transferencia bancaria utilizando los datos proporcionados. Este método es exclusivo para usuarios en Chile.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Accede a tu aplicación bancaria o banca en línea.
+    > 2. Selecciona la opción de **transferencia** o **pago a terceros**.
+    > 3. Ingresa los datos bancarios proporcionados abajo.
+    > 4. Realiza la transferencia por el monto acordado.
+    > 5. Toma una captura de pantalla del comprobante.
+    
+    **🏦 Información Bancaria**
+    
+    **Número de cuenta:**
+    ```1111 2287 8616```
+    
+    **RUT:**
+    ```22.878.616-0```
+    
+    **Banco:**
+    Tenpo Prepago SpA | Cuenta Vista
+    
+    **Nombre del Titular:**
+    Alexander Valdes
+    
+    **📸 Envío del Comprobante**
+    > Envía una captura de pantalla clara del comprobante que muestre la hora, fecha y monto de la transferencia.
+    
+    **⚠️ ¡Importante - Concepto de Pago!**
+    > - **NO pongas ninguna nota o concepto** si es opcional.
+    > - Si el sistema **te obliga a poner un concepto**, usa algo genérico como: "Donación", "Compra de zapatillas", "Pago de servicio", etc.
+    > - **NUNCA menciones** productos de videojuegos, cheats, hacks o similares.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+TransferenciaMéxico:
+  title: ""
+  description: |
+    ## 🇲🇽 **__Pago mediante Transferencia - México__**
+    
+    > Realiza tu pago por transferencia bancaria utilizando los datos proporcionados. Este método es exclusivo para usuarios en México.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Accede a tu aplicación bancaria o banca en línea.
+    > 2. Selecciona la opción de **transferencia SPEI**.
+    > 3. Ingresa la CLABE proporcionada abajo.
+    > 4. Realiza la transferencia por el monto acordado.
+    > 5. Toma una captura de pantalla del comprobante.
+    
+    **🏦 Información Bancaria**
+    
+    **CLABE:**
+    ```6381 8000 0160 0962 17```
+    
+    **Banco:**
+    NU Bank/México
+    
+    **Nombre del Titular:**
+    Gonzalo Nuñez
+    
+    **📸 Envío del Comprobante**
+    > Envía una captura de pantalla clara del comprobante que muestre la hora, fecha y monto de la transferencia.
+    
+    **⚠️ ¡Importante - Concepto de Pago!**
+    > - **NO pongas ninguna nota o concepto** si es opcional.
+    > - Si el sistema **te obliga a poner un concepto**, usa algo genérico como: "Donación", "Compra de zapatillas", "Pago de servicio", etc.
+    > - **NUNCA menciones** productos de videojuegos, cheats, hacks o similares.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+DepositoMéxico:
+  title: ""
+  description: |
+    ## 🇲🇽 **__Pago mediante Depósito - México__**
+    
+    > Realiza tu pago mediante depósito en efectivo en cualquier tienda OXXO. Este método es ideal si prefieres pagar en efectivo.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Dirígete a cualquier tienda **OXXO** cercana.
+    > 2. Solicita realizar un depósito a la CLABE proporcionada.
+    > 3. Entrega el efectivo correspondiente al monto acordado.
+    > 4. Conserva tu comprobante de depósito.
+    > 5. Toma una captura de pantalla o foto del comprobante.
+    
+    **🏦 Información para Depósito**
+    
+    **CLABE (Depósito):**
+    ```2242 1701 8073 4399```
+    
+    **Banco:**
+    Spin By Oxxo
+    
+    **Nombre del Titular:**
+    Gonzalo Nuñez
+    
+    **📸 Envío del Comprobante**
+    > Envía una foto o captura clara del comprobante que muestre la hora, fecha y monto del depósito.
+    
+    **⚠️ ¡Importante - Concepto de Pago!**
+    > - **NO pongas ninguna nota o concepto** si es opcional.
+    > - Si el sistema **te obliga a poner un concepto**, usa algo genérico como: "Donación", "Compra de zapatillas", "Pago de servicio", etc.
+    > - **NUNCA menciones** productos de videojuegos, cheats, hacks o similares.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+"Yape/Plin":
+  title: ""
+  description: |
+    ## 🇵🇪 **__Pago con Yape/Plin - Perú__**
+    
+    > Realiza tu pago de forma instantánea utilizando Yape o Plin. Este método es exclusivo para usuarios en Perú y es el más rápido disponible.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Abre tu aplicación de **Yape** o **Plin**.
+    > 2. Selecciona la opción de **Yapear** o **Enviar dinero**.
+    > 3. Ingresa el número de teléfono proporcionado abajo.
+    > 4. Ingresa el monto acordado.
+    > 5. Confirma el pago y toma una captura del comprobante.
+    
+    **📱 Información de Pago**
+    
+    **Número de cuenta:**
+    ```936 623 605```
+    
+    **Métodos aceptados:**
+    Yape / Plin
+    
+    **Nombre del Titular:**
+    Arian Cerna M.
+    
+    **📸 Envío del Comprobante**
+    > Una vez realizado el pago, envía una captura de pantalla clara que muestre la hora, fecha y monto de la transacción.
+    
+    **⚠️ ¡Importante - Concepto de Pago!**
+    > - **NO pongas ninguna nota o concepto** si es opcional.
+    > - Si el sistema **te obliga a poner un concepto**, usa algo genérico como: "Donación", "Compra de zapatillas", "Pago de servicio", etc.
+    > - **NUNCA menciones** productos de videojuegos, cheats, hacks o similares.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+Criptomonedas:
+  title: ""
+  description: |
+    ## 🔐 **__Pago con Criptomonedas__**
+    
+    > Realiza tu pago de forma segura y descentralizada utilizando criptomonedas. Aceptamos LTC, BTC y USDT. Este método ofrece privacidad y rapidez en las transacciones.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Abre tu **wallet de criptomonedas** (Binance, Trust Wallet, Coinbase, etc.).
+    > 2. Selecciona la criptomoneda que deseas usar (LTC, BTC o USDT).
+    > 3. Copia la dirección de wallet correspondiente proporcionada abajo.
+    > 4. **Verifica que la red sea correcta** (especialmente para USDT).
+    > 5. Envía el monto acordado.
+    > 6. Toma una captura de pantalla del comprobante de transacción.
+    
+    **💎 Wallets Disponibles**
+    
+    **Litecoin (LTC):**
+    ```Li43p3wMFfpJwEiunrAyBe1Z1gckGBQJMf```
+    
+    **Bitcoin (BTC):**
+    ```1BVXFnn9F6jMbRt4iuxUqia1a6GwsuaYJG```
+    
+    **USDT (Tether):**
+    ```0x34d95a3093e8256500263fd688f8c2e0c979b3e0```
+    **Red:** BEP20 (Binance Smart Chain)
+    
+    **📸 Envío del Comprobante**
+    > Una vez realizado el pago, envíanos la captura de pantalla del comprobante que muestre:
+    > - Hash de la transacción (TxID)
+    > - Monto enviado
+    > - Criptomoneda utilizada
+    > - Fecha y hora de la transacción
+    
+    **⚠️ ¡Importante - Verificación de Red!**
+    > - Para **USDT**, asegúrate de usar la red **BEP20 (BSC)**. Usar otra red resultará en pérdida de fondos.
+    > - **Verifica dos veces** la dirección de wallet antes de enviar.
+    > - Las transacciones de criptomonedas son **irreversibles**.
+    > - Espera las confirmaciones necesarias de la red antes de notificarnos.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+
+GiftCards:
+  title: ""
+  description: |
+    ## 🎁 **__Pago con Gift Cards__**
+    
+    > Realiza tu pago utilizando tarjetas de regalo digitales. Aceptamos Binance Gift Cards y PSN Cards. Este método es ideal si prefieres no usar métodos bancarios tradicionales.
+    
+    **📝 Instrucciones de Pago**
+    > 1. Compra la gift card en uno de los **proveedores autorizados** listados abajo.
+    > 2. **Verifica que la región sea correcta** (Global o Perú).
+    > 3. Una vez recibida, envía el **código de la gift card** al privado del dueño.
+    > 4. Adjunta el **comprobante de compra** con fecha y monto.
+    
+    **🎮 Binance Gift Card**
+    
+    > **Proveedores Autorizados:**
+    > 
+    > **Eneba (Principal):**
+    > [Comprar Binance Gift Card en Eneba](https://www.eneba.com/latam/store/binance-gift-cards)
+    > 
+    > **G2A (Alternativo):**
+    > [Comprar Binance Gift Card en G2A](https://www.g2a.com/es/best-deals/binance-gift-cards)
+    
+    **🎮 PSN Cards (PlayStation Network)**
+    
+    > **Proveedor Autorizado:**
+    > 
+    > **Games Center Perú:**
+    > [Comprar PSN Cards en Games Center](https://gamescenter.pe/categoria-producto/psn-cards-playstation/)
+    
+    **📨 Envío del Código y Comprobante**
+    > **Envía el código de la gift card al privado del dueño:**
+    > <@1412060465105862706> (juztswift)
+    > 
+    > Debes incluir:
+    > - Código completo de la gift card
+    > - Captura del comprobante de compra
+    > - Región de la tarjeta (debe ser Global o Perú)
+    
+    **⚠️ ¡Importante - Región de las Tarjetas!**
+    > - Las gift cards **DEBEN ser Globales o para Perú**.
+    > - **NO compres** tarjetas de otras regiones (USA, Europa, etc.) si no especifican que son globales.
+    > - Tarjetas de región incorrecta **NO pueden ser canjeadas en Perú** y resultarán en pérdida de dinero.
+    > - **Verifica la región ANTES de comprar** para evitar problemas.
+    > - Si tienes dudas sobre la región, pregunta antes de realizar la compra.
+    > - **NUNCA compartas el código de la gift card públicamente**, solo envíalo por privado al dueño.
+  color: null
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
