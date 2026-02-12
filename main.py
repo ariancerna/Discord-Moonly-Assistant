@@ -49,6 +49,7 @@ class MoonlyBot(commands.Bot):
             'cogs.embeds',
             'cogs.licenses',
             'cogs.reports',
+            'cogs.sellauth',
             'cogs.panels'
         ]
         self.synced = False  # Flag to track if we've synced commands
@@ -99,13 +100,7 @@ class MoonlyBot(commands.Bot):
                 logger.info("📋 Available commands:")
                 for cmd in synced:
                     logger.info(f"  • /{cmd.name}")
-                
-                # Optional: Sync to specific guild for instant testing
-                # Uncomment these lines to sync immediately to your test server
-                # guild = discord.Object(id=1460861614134792252)
-                # await self.tree.sync(guild=guild)
-                # logger.info(f"\n✅ Also synced to test guild for instant update")
-                
+                                
                 self.synced = True
                 
             except Exception as e:
@@ -132,25 +127,8 @@ class MoonlyBot(commands.Bot):
 bot = MoonlyBot()
 
 @bot.event
-async def on_interaction(interaction: discord.Interaction):
-    """Log slash command usage"""
-    if interaction.type == discord.InteractionType.application_command:
-        # Format options
-        options_str = ""
-        if interaction.data.get('options'):
-            options_list = []
-            for opt in interaction.data['options']:
-                value = opt['value']
-                options_list.append(f"{opt['name']}:{value}")
-            options_str = ", ".join(options_list)
-        
-        # Log the command
-        logger.log_command(
-            interaction.user.name,
-            interaction.user.id,
-            interaction.command.name,
-            options_str
-        )
+async def on_app_command_completion(interaction: discord.Interaction, command):
+    logger.info(f"Command used: /{command.name} by {interaction.user} (ID: {interaction.user.id}) in {interaction.guild} (ID: {interaction.guild_id})")
 
 @bot.event
 async def on_command_error(ctx, error):
