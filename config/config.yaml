@@ -32,3 +32,7 @@ webhooks:
 
 # Default avatar URL
 default_avatar: "https://i.imgur.com/Y5w3zlV.png"
+
+sellauth:
+  api_key: "5447911|1Ovyx3P5O9SX6zt2JVrNifo3ZfqTrqjqYzk79Tklf1c90a29"
+  shop_id: "106038"
