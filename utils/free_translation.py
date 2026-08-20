@@ -45,6 +45,14 @@ class TranslationStore:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (message_id, language)
                 );
+
+                CREATE TABLE IF NOT EXISTS embed_builder_drafts (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    draft_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (guild_id, user_id)
+                );
                 """
             )
 
@@ -90,6 +98,49 @@ class TranslationStore:
                 (message_id, language),
             ).fetchone()
         return json.loads(row[0]) if row else None
+
+    def clear_translations(self, message_id: int):
+        """Discard cached translations after the source publication is edited."""
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM translated_embed_cache WHERE message_id = ?",
+                (message_id,),
+            )
+
+    def save_builder_draft(self, guild_id: int, user_id: int, data: dict):
+        payload = json.dumps(data, ensure_ascii=False)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO embed_builder_drafts (guild_id, user_id, draft_json)
+                VALUES (?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    draft_json = excluded.draft_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (guild_id, user_id, payload),
+            )
+
+    def get_builder_draft(self, guild_id: int, user_id: int) -> Optional[dict]:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT draft_json FROM embed_builder_drafts
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def delete_builder_draft(self, guild_id: int, user_id: int):
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM embed_builder_drafts
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            )
 
 
 class FreeGoogleTranslationService:

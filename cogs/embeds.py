@@ -60,6 +60,7 @@ class EmbedDraft:
     translation_enabled: bool = True
     sections: list[str] = field(default_factory=list)
     buttons: list[EmbedButtonData] = field(default_factory=list)
+    target_message: Optional[discord.Message] = field(default=None, repr=False)
 
 
 def parse_hex_color(value: str, default: int) -> int:
@@ -166,6 +167,10 @@ def draft_content_length(draft: EmbedDraft) -> int:
     )
 
 
+def has_primary_content(draft: EmbedDraft) -> bool:
+    return bool(draft.title.strip() or draft.description.strip())
+
+
 def publication_mentions(draft: EmbedDraft) -> discord.AllowedMentions:
     """Allow only the optional @everyone ping; never ping user or role mentions."""
     return discord.AllowedMentions(
@@ -178,6 +183,7 @@ def publication_mentions(draft: EmbedDraft) -> discord.AllowedMentions:
 
 def draft_to_data(draft: EmbedDraft) -> dict:
     return {
+        "channel_id": getattr(draft.channel, "id", None),
         "title": draft.title,
         "description": draft.description,
         "color": draft.color,
@@ -350,13 +356,18 @@ def builder_status(draft: EmbedDraft) -> str:
     plural = "botón" if len(draft.buttons) == 1 else "botones"
     everyone_status = "🟢 Sí" if draft.mention_everyone else "⚫ No"
     translation_status = "🟢 Activo" if draft.translation_enabled else "⚫ Desactivado"
+    action = "Editando publicación" if draft.target_message else "Creador de publicación profesional"
+    target = f"Mensaje: **{draft.target_message.id}**\n" if draft.target_message else ""
+    autosave = "" if draft.target_message else "\n💾 **Borrador guardado automáticamente.**\n"
     return (
-        "🧰 **Creador de publicación profesional**\n"
+        f"🧰 **{action}**\n"
         f"Destino: {draft.channel.mention}\n"
+        f"{target}"
         f"Configurados: **{len(draft.buttons)}/{MAX_BUILDER_BUTTONS} {plural}**\n\n"
         f"Secciones separadas: **{len(draft.sections)}/{MAX_ANNOUNCEMENT_SECTIONS}**\n"
         f"Notificar a @everyone: **{everyone_status}**\n"
         f"Traductor: **{translation_status}**\n\n"
+        f"{autosave}"
         "Puedes editar el contenido, agregar botones, revisar una vista previa privada "
         "y publicarlo cuando esté listo."
     )
@@ -369,7 +380,8 @@ class EmbedBasicsModal(discord.ui.Modal):
         translation_service: FreeGoogleTranslationService,
         controls: Optional["EmbedBuilderControls"] = None,
     ):
-        super().__init__(title="Crear embed profesional", timeout=600)
+        modal_title = "Editar publicación" if draft.target_message else "Crear embed profesional"
+        super().__init__(title=modal_title, timeout=600)
         self.draft = draft
         self.translation_service = translation_service
         self.controls = controls
@@ -386,7 +398,7 @@ class EmbedBasicsModal(discord.ui.Modal):
             placeholder="Admite Markdown, emojis y menciones de Discord.",
             default=draft.description or None,
             style=discord.TextStyle.paragraph,
-            required=True,
+            required=False,
             max_length=3000,
         )
         self.color_input = discord.ui.TextInput(
@@ -429,9 +441,6 @@ class EmbedBasicsModal(discord.ui.Modal):
             return
 
         description = str(self.description_input).strip()
-        if not description:
-            await interaction.response.send_message("❌ El contenido no puede estar vacío.", ephemeral=True)
-            return
 
         previous = (
             self.draft.title,
@@ -466,6 +475,7 @@ class EmbedBasicsModal(discord.ui.Modal):
                 self.draft,
                 self.translation_service,
             )
+            controls.persist_draft()
             await interaction.response.send_message(
                 builder_status(self.draft),
                 view=controls,
@@ -473,6 +483,7 @@ class EmbedBasicsModal(discord.ui.Modal):
                 allowed_mentions=discord.AllowedMentions.none(),
             )
         else:
+            self.controls.persist_draft()
             self.controls.refresh()
             await interaction.response.edit_message(
                 content=builder_status(self.draft),
@@ -553,6 +564,7 @@ class AddEmbedButtonModal(discord.ui.Modal):
                 ephemeral=True,
             )
             return
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(self.controls.draft),
@@ -601,6 +613,7 @@ class AddAnnouncementSectionModal(discord.ui.Modal):
             )
             return
 
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(draft),
@@ -623,6 +636,7 @@ class RemoveLastEmbedButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.controls.draft.buttons:
             self.controls.draft.buttons.pop()
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(self.controls.draft),
@@ -652,6 +666,7 @@ class ToggleEveryoneButton(discord.ui.Button):
                 ephemeral=True,
             )
             return
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(self.controls.draft),
@@ -674,6 +689,7 @@ class ToggleTranslationButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         self.controls.draft.translation_enabled = not self.controls.draft.translation_enabled
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(self.controls.draft),
@@ -710,6 +726,7 @@ class RemoveLastAnnouncementSectionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.controls.draft.sections:
             self.controls.draft.sections.pop()
+        self.controls.persist_draft()
         self.controls.refresh()
         await interaction.response.edit_message(
             content=builder_status(self.controls.draft),
@@ -739,7 +756,39 @@ class EmbedBuilderControls(discord.ui.View):
         self.add_item(self.toggle_translation)
         self.add_item(self.add_section)
         self.add_item(self.remove_section)
+        if self.draft.target_message is not None:
+            self.publish.label = "Guardar cambios"
+            self.publish.emoji = "💾"
         self.refresh()
+
+    def persist_draft(self) -> bool:
+        """Persist creation progress; message edits already have their own saved source."""
+        if self.draft.target_message is not None:
+            return True
+        guild = getattr(self.draft.channel, "guild", None)
+        if guild is None:
+            return False
+        try:
+            self.translation_service.store.save_builder_draft(
+                guild.id,
+                self.owner_id,
+                draft_to_data(self.draft),
+            )
+        except Exception:
+            return False
+        return True
+
+    def delete_persisted_draft(self) -> bool:
+        if self.draft.target_message is not None:
+            return True
+        guild = getattr(self.draft.channel, "guild", None)
+        if guild is None:
+            return False
+        try:
+            self.translation_service.store.delete_builder_draft(guild.id, self.owner_id)
+        except Exception:
+            return False
+        return True
 
     def refresh(self):
         self.add_button.disabled = len(self.draft.buttons) >= MAX_BUILDER_BUTTONS
@@ -766,6 +815,12 @@ class EmbedBuilderControls(discord.ui.View):
 
     @discord.ui.button(label="Vista previa", emoji="👁️", style=discord.ButtonStyle.secondary, row=0)
     async def preview(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not has_primary_content(self.draft):
+            await interaction.response.send_message(
+                "❌ Añade un título o contenido principal antes de generar la vista previa.",
+                ephemeral=True,
+            )
+            return
         try:
             preview = build_components_v2(
                 self.draft,
@@ -796,6 +851,12 @@ class EmbedBuilderControls(discord.ui.View):
 
     @discord.ui.button(label="Publicar", emoji="✅", style=discord.ButtonStyle.success, row=0)
     async def publish(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not has_primary_content(self.draft):
+            await interaction.response.send_message(
+                "❌ Añade un título o contenido principal antes de publicar.",
+                ephemeral=True,
+            )
+            return
         try:
             publication = build_components_v2(
                 self.draft,
@@ -809,32 +870,45 @@ class EmbedBuilderControls(discord.ui.View):
             return
 
         await interaction.response.defer(ephemeral=True)
+        editing = self.draft.target_message is not None
         try:
-            message = await self.draft.channel.send(
-                view=publication,
-                allowed_mentions=publication_mentions(self.draft),
-            )
+            if editing:
+                message = await self.draft.target_message.edit(
+                    view=publication,
+                    allowed_mentions=publication_mentions(self.draft),
+                )
+            else:
+                message = await self.draft.channel.send(
+                    view=publication,
+                    allowed_mentions=publication_mentions(self.draft),
+                )
         except discord.HTTPException as error:
+            action = "los cambios" if editing else "la publicación"
             await interaction.followup.send(
-                f"❌ Discord rechazó la publicación: {error}",
+                f"❌ Discord rechazó {action}: {error}",
                 ephemeral=True,
             )
             return
 
-        if self.draft.translation_enabled:
-            try:
-                self.translation_service.store.save_source(
-                    message.id,
-                    draft_to_data(self.draft),
-                )
-            except Exception:
-                await interaction.followup.send(
-                    "⚠️ La publicación se envió, pero no pude preparar su caché de traducciones.",
-                    ephemeral=True,
-                )
+        try:
+            self.translation_service.store.save_source(
+                message.id,
+                draft_to_data(self.draft),
+            )
+            if editing:
+                self.translation_service.store.clear_translations(message.id)
+        except Exception:
+            storage_action = "actualizó" if editing else "publicó"
+            await interaction.followup.send(
+                f"⚠️ El mensaje se {storage_action}, pero no pude guardar sus datos de edición y traducción.",
+                ephemeral=True,
+            )
 
         self.stop()
-        await interaction.edit_original_response(content="✅ Publicación enviada correctamente.", view=None)
+        if not editing:
+            self.delete_persisted_draft()
+        result = "✅ Cambios guardados correctamente." if editing else "✅ Publicación enviada correctamente."
+        await interaction.edit_original_response(content=result, view=None)
         await interaction.followup.send(
             f"[Ir a la publicación]({message.jump_url})",
             ephemeral=True,
@@ -843,7 +917,9 @@ class EmbedBuilderControls(discord.ui.View):
     @discord.ui.button(label="Cancelar", emoji="✖️", style=discord.ButtonStyle.danger, row=0)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
-        await interaction.response.edit_message(content="🗑️ Creación cancelada.", view=None)
+        self.delete_persisted_draft()
+        action = "Edición" if self.draft.target_message else "Creación"
+        await interaction.response.edit_message(content=f"🗑️ {action} cancelada.", view=None)
 
 
 class Embeds(commands.Cog):
@@ -860,13 +936,49 @@ class Embeds(commands.Cog):
         )
         self.bot.add_view(PersistentTranslationView(self.translation_service))
 
+    async def _find_guild_message(
+        self,
+        guild: discord.Guild,
+        current_channel: Optional[discord.abc.Messageable],
+        message_id: int,
+        stored_channel_id: Optional[int],
+    ) -> Optional[discord.Message]:
+        """Find a message by ID without requiring the administrator to provide a channel."""
+        candidates: list[discord.abc.Messageable] = []
+        seen: set[int] = set()
+
+        def add_candidate(channel):
+            channel_id = getattr(channel, "id", None)
+            if channel_id is None or channel_id in seen or not hasattr(channel, "fetch_message"):
+                return
+            seen.add(channel_id)
+            candidates.append(channel)
+
+        add_candidate(current_channel)
+        if stored_channel_id:
+            add_candidate(guild.get_channel(stored_channel_id) or guild.get_thread(stored_channel_id))
+        for channel in guild.text_channels:
+            add_candidate(channel)
+        for thread in guild.threads:
+            add_candidate(thread)
+
+        for channel in candidates:
+            try:
+                return await channel.fetch_message(message_id)
+            except (discord.NotFound, discord.Forbidden):
+                continue
+            except discord.HTTPException:
+                continue
+        return None
+
     @app_commands.command(
         name="crear-embed",
         description="Crea una publicación profesional con botones usando un asistente privado",
     )
+    @app_commands.describe(nuevo="Sí para descartar el borrador guardado y comenzar desde cero")
     @app_commands.guild_only()
     @app_commands.default_permissions(administrator=True)
-    async def create_custom_embed(self, interaction: discord.Interaction):
+    async def create_custom_embed(self, interaction: discord.Interaction, nuevo: bool = False):
         if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
                 "❌ Solo los administradores pueden usar este comando.",
@@ -891,12 +1003,110 @@ class Embeds(commands.Cog):
             )
             return
 
-        draft = EmbedDraft(
-            channel=interaction.channel,
-            color=self.config["bot"]["embed_color"],
-        )
+        try:
+            if nuevo:
+                self.translation_service.store.delete_builder_draft(
+                    interaction.guild.id,
+                    interaction.user.id,
+                )
+                saved_data = None
+            else:
+                saved_data = self.translation_service.store.get_builder_draft(
+                    interaction.guild.id,
+                    interaction.user.id,
+                )
+        except Exception:
+            saved_data = None
+
+        if saved_data:
+            saved_channel_id = saved_data.get("channel_id")
+            saved_channel = (
+                interaction.guild.get_channel(saved_channel_id)
+                or interaction.guild.get_thread(saved_channel_id)
+                if saved_channel_id
+                else None
+            )
+            draft = draft_from_data(saved_data, saved_channel or interaction.channel)
+        else:
+            draft = EmbedDraft(
+                channel=interaction.channel,
+                color=self.config["bot"]["embed_color"],
+            )
         await interaction.response.send_modal(
             EmbedBasicsModal(draft, self.translation_service)
+        )
+
+    @app_commands.command(
+        name="editar-embed",
+        description="Edita una publicación del bot usando únicamente el ID del mensaje",
+    )
+    @app_commands.describe(message_id="ID del mensaje publicado por este bot")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    async def edit_custom_embed(self, interaction: discord.Interaction, message_id: str):
+        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ Solo los administradores pueden usar este comando.",
+                ephemeral=True,
+            )
+            return
+
+        cleaned_id = message_id.strip()
+        if not cleaned_id.isdigit():
+            await interaction.response.send_message(
+                "❌ El ID del mensaje debe contener únicamente números.",
+                ephemeral=True,
+            )
+            return
+
+        numeric_id = int(cleaned_id)
+        try:
+            source_data = self.translation_service.store.get_source(numeric_id)
+        except Exception:
+            await interaction.response.send_message(
+                "❌ No pude consultar los datos guardados. Revisa el archivo de la base de datos e inténtalo nuevamente.",
+                ephemeral=True,
+            )
+            return
+        if source_data is None:
+            await interaction.response.send_message(
+                "❌ No encontré datos editables para ese mensaje. Solo pueden editarse publicaciones creadas con `/crear-embed` que conserven sus datos originales.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        message = await self._find_guild_message(
+            interaction.guild,
+            interaction.channel,
+            numeric_id,
+            source_data.get("channel_id"),
+        )
+        if message is None:
+            await interaction.followup.send(
+                "❌ No encontré ese mensaje en ningún canal visible de este servidor.",
+                ephemeral=True,
+            )
+            return
+
+        if self.bot.user is None or message.author.id != self.bot.user.id:
+            await interaction.followup.send(
+                "❌ El mensaje indicado no fue publicado por este bot.",
+                ephemeral=True,
+            )
+            return
+
+        draft = draft_from_data(source_data, message.channel)
+        draft.target_message = message
+        controls = EmbedBuilderControls(
+            interaction.user.id,
+            draft,
+            self.translation_service,
+        )
+        await interaction.edit_original_response(
+            content=builder_status(draft),
+            view=controls,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
     
     @app_commands.command(name="auto-response", description="Send an embed based on an option")
