@@ -1,21 +1,23 @@
-panels:
+﻿panels:
   hwid_reset:
     apps:
+      Boost Bot:
+        seller_key: SET_SELLER_KEY
       KeyAuth AIO:
-        seller_key: d6be9fa1d88b01e53fc5cb238e2ece23
+        seller_key: SET_SELLER_KEY
       Password Changer:
-        seller_key: 712385f83235762ab08444e77bc4b3ca
+        seller_key: SET_SELLER_KEY
       SellAuth AIO:
-        seller_key: 938cfbf6fccf0a4b05af05ce5db26063
+        seller_key: SET_SELLER_KEY
       Server Cloner:
-        seller_key: 3de6130612318618008328cdd96682c8
+        seller_key: SET_SELLER_KEY
       Status Rotator:
-        seller_key: 5ffdce7c1f6c778669406d80b50ca492
+        seller_key: SET_SELLER_KEY
       Token Checker:
-        seller_key: 6452d6260362075724bd09c0d685e1eb
-    channel_id: 0
-    log_channel_id: 1408893713513582642
-    message_id: 0
+        seller_key: SET_SELLER_KEY
+    channel_id: 1430931802310312180
+    log_channel_id: 1483914725069688872
+    message_id: 1483607176969846816
   showcase:
     apps:
       Boost Tool: https://www.youtube.com/watch?v=du1CDrTHSNA

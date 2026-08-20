@@ -1,5 +1,5 @@
-bot:
-  token: "MTI5NjMwMzg2ODU4NTQ0MzQzOQ.GR-O5-.mddDI_QeGCjXESIaQoTCkv3xdszsOKnnOyngNw"
+﻿bot:
+  token: "SET_DISCORD_BOT_TOKEN"
   prefix: "!"
   status:
     type: "playing"  # playing, watching, listening, streaming, competing
@@ -10,6 +10,7 @@ bot:
 # Server Configuration
 roles:
   client_role: 1159639724407935098  # Role ID for clients
+  vouch_manager_role: 1159641262077509642  # Puede restaurar y eliminar vouches
   moderator_role: 1236091726301761567  # Moderator role ID
   support_role: 1219803282223009962 # Support role ID
   admin_role: 1162039017248923728  # Admin role ID
@@ -28,11 +29,57 @@ allowed_categories:
 
 # Webhook for license logs
 webhooks:
-  license_webhook: "https://discord.com/api/webhooks/1402102913756565554/OhrzIeWdj4mSuyBIUNEK0_MXM5-lxxkcIAQRtdzpcQ-Xy7lGwgAf3CfKA4cXl3mHPjuK"
+  license_webhook: "SET_DISCORD_LICENSE_WEBHOOK"
 
 # Default avatar URL
 default_avatar: "https://i.imgur.com/Y5w3zlV.png"
 
 sellauth:
-  api_key: "5447911|1Ovyx3P5O9SX6zt2JVrNifo3ZfqTrqjqYzk79Tklf1c90a29"
+  api_key: "SET_SELLAUTH_API_KEY"
   shop_id: "106038"
+
+vouch:
+  database_path: "data/vouches.db"
+  image_directory: "data/vouch_images"
+  restore_delay: 1.0  # Segundos entre cada vouch para evitar rate limits
+  restore_retries: 3  # Reintentos ante errores temporales de Discord
+  website_url: "https://myvouch.es/moonly"
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+  footer_icon: "https://i.imgur.com/p1BgaKk.png"
+  review_channel_url: "https://discord.com/channels/1159639252838129704/1159643310252638268"
+
+# Auto-recordatorio en el canal de reseñas
+reminder:
+  channel_id: 1159643310252638268  # Canal donde se envía el recordatorio
+  delay: 1  # Segundos de espera tras el mensaje del usuario
+  ticket_channel_id: 1159646450704203821  # Canal de tickets (0 = usa el texto de abajo)
+  ticket_channel_text: "**#🎫・tickets**"
+  vouch_command: "</vouch:1403090399777784010>"
+  website_url: "https://moonlygg.com"
+  button_label: "Nuestra Página Web"
+  button_emoji: "<:PandaDab:1234344971264331836>"
+  thumbnail: "https://i.imgur.com/p1BgaKk.png"
+  footer_text: "Moonly Manager - Mensajes Fijados"
+  footer_icon: "https://i.imgur.com/p1BgaKk.png"
+
+# Protección contra campañas de spam con imágenes
+antispam:
+  enabled: true
+  alert_channel_id: 1207453755885494352
+  database_path: "data/antispam.db"
+  delete_threshold: 70
+  timeout_threshold: 70  # Igual al umbral de eliminación: siempre aplica timeout
+  timeout_minutes: 10080  # 7 días
+  window_seconds: 45
+  campaign_window_seconds: 300
+  visual_distance: 8
+  maximum_image_bytes: 10485760
+  maximum_image_pixels: 40000000
+  analysis_concurrency: 4
+  exempt_channel_ids: []
+  exempt_role_ids: []
+
+# Traducciones gratuitas de las publicaciones creadas con /crear-embed
+translation:
+  provider: "deep-translator"
+  database_path: "data/embed_translations.db"

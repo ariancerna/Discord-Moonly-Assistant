@@ -43,6 +43,7 @@ class MoonlyBot(commands.Bot):
         self.config = config
         self.embed_loader = None
         self.initial_extensions = [
+            'cogs.antispam',
             'cogs.moderation',
             'cogs.utility',
             'cogs.management',
@@ -50,7 +51,9 @@ class MoonlyBot(commands.Bot):
             'cogs.licenses',
             'cogs.reports',
             'cogs.sellauth',
-            'cogs.panels'
+            'cogs.panels',
+            'cogs.vouch',
+            'cogs.reminder'
         ]
         self.synced = False  # Flag to track if we've synced commands
     

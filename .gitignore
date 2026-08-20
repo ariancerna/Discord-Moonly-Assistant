@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+# Runtime state and user-provided media
+data/
+logs/
+
+# Local environments and secrets
+.env
+.venv/
+venv/
+

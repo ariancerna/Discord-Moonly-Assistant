@@ -1,4 +1,8 @@
-discord.py>=2.3.0
+discord.py>=2.6.4,<3.0
 PyYAML>=6.0
 requests>=2.31.0
 aiohttp>=3.8.5
+cloudscraper
+curl_cffi
+Pillow>=10.0.0
+deep-translator==1.11.4

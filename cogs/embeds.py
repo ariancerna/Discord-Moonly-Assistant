@@ -1,12 +1,903 @@
+from __future__ import annotations
+
 import discord
 from discord import app_commands
 from discord.ext import commands
+import copy
+from dataclasses import dataclass, field
+from typing import Optional
+from urllib.parse import urlparse
+
+from utils.free_translation import FreeGoogleTranslationService, TranslationError
+
+
+MAX_BUILDER_BUTTONS = 5
+# Five keeps the full message below Discord's 40-component limit, including
+# thumbnail, banner, five button sections, and the translation selector.
+MAX_ANNOUNCEMENT_SECTIONS = 5
+
+TRANSLATION_LANGUAGES = (
+    ("🇬🇧", "English", "en"),
+    ("🇩🇪", "Deutsch", "de"),
+    ("🇫🇷", "Français", "fr"),
+    ("🇪🇸", "Español", "es"),
+    ("🇧🇷", "Português", "pt"),
+    ("🇷🇺", "Русский", "ru"),
+    ("🇨🇳", "中文", "zh-CN"),
+    ("🇸🇦", "العربية", "ar"),
+    ("🇮🇹", "Italiano", "it"),
+    ("🇳🇱", "Nederlands", "nl"),
+    ("🇮🇳", "हिन्दी", "hi"),
+    ("🇮🇩", "Bahasa Indonesia", "id"),
+    ("🇯🇵", "日本語", "ja"),
+    ("🇰🇷", "한국어", "ko"),
+    ("🇻🇳", "Tiếng Việt", "vi"),
+    ("🇹🇷", "Türkçe", "tr"),
+    ("🇵🇱", "Polski", "pl"),
+    ("🇺🇦", "Українська", "uk"),
+    ("🇹🇭", "ไทย", "th"),
+    ("🇸🇪", "Svenska", "sv"),
+)
+
+
+@dataclass
+class EmbedButtonData:
+    section_text: str
+    label: str
+    url: str
+    emoji: Optional[str] = None
+
+
+@dataclass
+class EmbedDraft:
+    channel: discord.abc.Messageable
+    title: str = ""
+    description: str = ""
+    color: int = 0x6C02FF
+    banner_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    mention_everyone: bool = False
+    translation_enabled: bool = True
+    sections: list[str] = field(default_factory=list)
+    buttons: list[EmbedButtonData] = field(default_factory=list)
+
+
+def parse_hex_color(value: str, default: int) -> int:
+    """Parse #RRGGBB, RRGGBB or 0xRRGGBB into a Discord colour."""
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return default
+    if cleaned.startswith("#"):
+        cleaned = cleaned[1:]
+    elif cleaned.startswith("0x"):
+        cleaned = cleaned[2:]
+    if len(cleaned) != 6 or any(char not in "0123456789abcdef" for char in cleaned):
+        raise ValueError("El color debe tener el formato #RRGGBB, por ejemplo #00D4FF.")
+    return int(cleaned, 16)
+
+
+def validate_web_url(value: str, field_name: str) -> Optional[str]:
+    """Return a normalised HTTP(S) URL or raise a user-facing validation error."""
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"{field_name} debe ser una URL completa que empiece por http:// o https://.")
+    return cleaned
+
+
+def build_components_v2(
+    draft: EmbedDraft,
+    translation_service: Optional[FreeGoogleTranslationService] = None,
+    *,
+    translation_disabled: bool = False,
+) -> discord.ui.LayoutView:
+    """Build a Components V2 message matching Discord's modern container layout."""
+    view = discord.ui.LayoutView(timeout=None)
+    items: list[discord.ui.Item] = []
+
+    main_text = draft.description
+    if draft.title:
+        main_text = f"## {draft.title}\n{main_text}"
+
+    if draft.thumbnail_url:
+        items.append(
+            discord.ui.Section(
+                main_text,
+                accessory=discord.ui.Thumbnail(draft.thumbnail_url),
+            )
+        )
+    else:
+        items.append(discord.ui.TextDisplay(main_text))
+
+    for section in draft.sections:
+        items.append(discord.ui.Separator())
+        items.append(discord.ui.TextDisplay(section))
+
+    for button in draft.buttons:
+        items.append(discord.ui.Separator())
+        items.append(
+            discord.ui.Section(
+                button.section_text,
+                accessory=discord.ui.Button(
+                    label=button.label,
+                    url=button.url,
+                    emoji=button.emoji or None,
+                ),
+            )
+        )
+
+    if draft.banner_url:
+        items.append(discord.ui.Separator())
+        gallery = discord.ui.MediaGallery()
+        gallery.add_item(media=draft.banner_url)
+        items.append(gallery)
+
+    if translation_service is not None:
+        items.append(discord.ui.Separator())
+        items.append(
+            discord.ui.ActionRow(
+                TranslationSelect(translation_service, disabled=translation_disabled)
+            )
+        )
+
+    if draft.mention_everyone:
+        view.add_item(discord.ui.TextDisplay("||@everyone||"))
+    view.add_item(discord.ui.Container(*items, accent_color=draft.color))
+    if view.content_length() > 4000:
+        raise ValueError(
+            f"el texto visible usa {view.content_length()}/4000 caracteres; reduce el contenido"
+        )
+    return view
+
+
+def draft_content_length(draft: EmbedDraft) -> int:
+    """Count all visible text as Discord does for a LayoutView."""
+    main_length = len(draft.description)
+    if draft.title:
+        main_length += len(draft.title) + 4  # "## " plus the newline.
+    if draft.mention_everyone:
+        main_length += 13  # Standalone "||@everyone||" text display.
+    return (
+        main_length
+        + sum(len(section) for section in draft.sections)
+        + sum(len(button.section_text) for button in draft.buttons)
+    )
+
+
+def publication_mentions(draft: EmbedDraft) -> discord.AllowedMentions:
+    """Allow only the optional @everyone ping; never ping user or role mentions."""
+    return discord.AllowedMentions(
+        everyone=draft.mention_everyone,
+        users=False,
+        roles=False,
+        replied_user=False,
+    )
+
+
+def draft_to_data(draft: EmbedDraft) -> dict:
+    return {
+        "title": draft.title,
+        "description": draft.description,
+        "color": draft.color,
+        "banner_url": draft.banner_url,
+        "thumbnail_url": draft.thumbnail_url,
+        "mention_everyone": draft.mention_everyone,
+        "translation_enabled": draft.translation_enabled,
+        "sections": list(draft.sections),
+        "buttons": [
+            {
+                "section_text": button.section_text,
+                "label": button.label,
+                "url": button.url,
+                "emoji": button.emoji,
+            }
+            for button in draft.buttons
+        ],
+    }
+
+
+def draft_from_data(data: dict, channel: discord.abc.Messageable) -> EmbedDraft:
+    return EmbedDraft(
+        channel=channel,
+        title=str(data.get("title", "")),
+        description=str(data.get("description", "")),
+        color=int(data.get("color", 0x6C02FF)),
+        banner_url=data.get("banner_url"),
+        thumbnail_url=data.get("thumbnail_url"),
+        mention_everyone=bool(data.get("mention_everyone", False)),
+        translation_enabled=bool(data.get("translation_enabled", True)),
+        sections=[str(section) for section in data.get("sections", [])],
+        buttons=[
+            EmbedButtonData(
+                section_text=str(button.get("section_text", "")),
+                label=str(button.get("label", "")),
+                url=str(button.get("url", "")),
+                emoji=button.get("emoji"),
+            )
+            for button in data.get("buttons", [])
+        ],
+    )
+
+
+async def translate_draft_data(
+    data: dict,
+    target_language: str,
+    service: FreeGoogleTranslationService,
+) -> dict:
+    translated_data = copy.deepcopy(data)
+    texts = [
+        str(translated_data.get("title", "")),
+        str(translated_data.get("description", "")),
+    ]
+    texts.extend(str(section) for section in translated_data.get("sections", []))
+    for button in translated_data.get("buttons", []):
+        texts.append(str(button.get("section_text", "")))
+        texts.append(str(button.get("label", "")))
+
+    translated = iter(await service.translate_many(texts, target_language))
+    translated_data["title"] = next(translated)
+    translated_data["description"] = next(translated)
+    translated_data["sections"] = [
+        next(translated) for _ in translated_data.get("sections", [])
+    ]
+    for button in translated_data.get("buttons", []):
+        button["section_text"] = next(translated)
+        button["label"] = next(translated)[:80]
+
+    # A private translation must never repeat a mass notification.
+    translated_data["mention_everyone"] = False
+    return translated_data
+
+
+class TranslationSelect(discord.ui.Select):
+    def __init__(
+        self,
+        service: FreeGoogleTranslationService,
+        *,
+        disabled: bool = False,
+    ):
+        self.translation_service = service
+        options = [
+            discord.SelectOption(label=name, value=code, emoji=flag)
+            for flag, name, code in TRANSLATION_LANGUAGES
+        ]
+        super().__init__(
+            placeholder="🌐 Traducir este mensaje...",
+            custom_id="professional_embed_translate:v1",
+            options=options,
+            min_values=1,
+            max_values=1,
+            disabled=disabled,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        language = self.values[0]
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        if interaction.message is None or interaction.channel is None:
+            await interaction.followup.send(
+                "❌ No pude identificar la publicación original.",
+                ephemeral=True,
+            )
+            return
+
+        message_id = interaction.message.id
+        try:
+            translated_data = self.translation_service.store.get_translation(
+                message_id, language
+            )
+            if translated_data is None:
+                retry_after = self.translation_service.translation_retry_after(
+                    interaction.user.id
+                )
+                if retry_after > 0:
+                    await interaction.followup.send(
+                        f"⏳ Espera {retry_after:.0f} segundos antes de solicitar otra traducción nueva.",
+                        ephemeral=True,
+                    )
+                    return
+                source_data = self.translation_service.store.get_source(message_id)
+                if source_data is None:
+                    await interaction.followup.send(
+                        "❌ Esta publicación es anterior al sistema de traducción. Vuelve a publicarla con `/crear-embed`.",
+                        ephemeral=True,
+                    )
+                    return
+                translated_data = await translate_draft_data(
+                    source_data,
+                    language,
+                    self.translation_service,
+                )
+
+            translated_draft = draft_from_data(translated_data, interaction.channel)
+            translated_view = build_components_v2(translated_draft)
+            self.translation_service.store.save_translation(
+                message_id,
+                language,
+                translated_data,
+            )
+        except TranslationError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            return
+        except (TypeError, ValueError) as error:
+            await interaction.followup.send(
+                f"❌ La traducción superó un límite de Discord: {error}",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            await interaction.followup.send(
+                "❌ No se pudo traducir el mensaje en este momento. Inténtalo nuevamente más tarde.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            view=translated_view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class PersistentTranslationView(discord.ui.LayoutView):
+    def __init__(self, service: FreeGoogleTranslationService):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.ActionRow(TranslationSelect(service)))
+
+
+def builder_status(draft: EmbedDraft) -> str:
+    plural = "botón" if len(draft.buttons) == 1 else "botones"
+    everyone_status = "🟢 Sí" if draft.mention_everyone else "⚫ No"
+    translation_status = "🟢 Activo" if draft.translation_enabled else "⚫ Desactivado"
+    return (
+        "🧰 **Creador de publicación profesional**\n"
+        f"Destino: {draft.channel.mention}\n"
+        f"Configurados: **{len(draft.buttons)}/{MAX_BUILDER_BUTTONS} {plural}**\n\n"
+        f"Secciones separadas: **{len(draft.sections)}/{MAX_ANNOUNCEMENT_SECTIONS}**\n"
+        f"Notificar a @everyone: **{everyone_status}**\n"
+        f"Traductor: **{translation_status}**\n\n"
+        "Puedes editar el contenido, agregar botones, revisar una vista previa privada "
+        "y publicarlo cuando esté listo."
+    )
+
+
+class EmbedBasicsModal(discord.ui.Modal):
+    def __init__(
+        self,
+        draft: EmbedDraft,
+        translation_service: FreeGoogleTranslationService,
+        controls: Optional["EmbedBuilderControls"] = None,
+    ):
+        super().__init__(title="Crear embed profesional", timeout=600)
+        self.draft = draft
+        self.translation_service = translation_service
+        self.controls = controls
+
+        self.title_input = discord.ui.TextInput(
+            label="Título",
+            placeholder="Ejemplo: 🔐 Proyecto privado",
+            default=draft.title or None,
+            required=False,
+            max_length=250,
+        )
+        self.description_input = discord.ui.TextInput(
+            label="Contenido",
+            placeholder="Admite Markdown, emojis y menciones de Discord.",
+            default=draft.description or None,
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=3000,
+        )
+        self.color_input = discord.ui.TextInput(
+            label="Color hexadecimal",
+            placeholder="#00D4FF",
+            default=f"#{draft.color:06X}",
+            required=False,
+            max_length=8,
+        )
+        self.banner_input = discord.ui.TextInput(
+            label="URL del banner inferior",
+            placeholder="https://ejemplo.com/banner.png",
+            default=draft.banner_url,
+            required=False,
+            max_length=500,
+        )
+        self.thumbnail_input = discord.ui.TextInput(
+            label="URL del thumbnail lateral",
+            placeholder="https://ejemplo.com/logo.png",
+            default=draft.thumbnail_url,
+            required=False,
+            max_length=500,
+        )
+        for item in (
+            self.title_input,
+            self.description_input,
+            self.color_input,
+            self.banner_input,
+            self.thumbnail_input,
+        ):
+            self.add_item(item)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            color = parse_hex_color(str(self.color_input), self.draft.color)
+            banner_url = validate_web_url(str(self.banner_input), "El banner")
+            thumbnail_url = validate_web_url(str(self.thumbnail_input), "El thumbnail")
+        except ValueError as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            return
+
+        description = str(self.description_input).strip()
+        if not description:
+            await interaction.response.send_message("❌ El contenido no puede estar vacío.", ephemeral=True)
+            return
+
+        previous = (
+            self.draft.title,
+            self.draft.description,
+            self.draft.color,
+            self.draft.banner_url,
+            self.draft.thumbnail_url,
+        )
+        self.draft.title = str(self.title_input).strip()
+        self.draft.description = description
+        self.draft.color = color
+        self.draft.banner_url = banner_url
+        self.draft.thumbnail_url = thumbnail_url
+        if draft_content_length(self.draft) > 4000:
+            used = draft_content_length(self.draft)
+            (
+                self.draft.title,
+                self.draft.description,
+                self.draft.color,
+                self.draft.banner_url,
+                self.draft.thumbnail_url,
+            ) = previous
+            await interaction.response.send_message(
+                f"❌ El texto visible usa {used}/4000 caracteres. Reduce el contenido e inténtalo de nuevo.",
+                ephemeral=True,
+            )
+            return
+
+        if self.controls is None:
+            controls = EmbedBuilderControls(
+                interaction.user.id,
+                self.draft,
+                self.translation_service,
+            )
+            await interaction.response.send_message(
+                builder_status(self.draft),
+                view=controls,
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        else:
+            self.controls.refresh()
+            await interaction.response.edit_message(
+                content=builder_status(self.draft),
+                view=self.controls,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+
+
+class AddEmbedButtonModal(discord.ui.Modal):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        super().__init__(title="Agregar botón al embed", timeout=600)
+        self.controls = controls
+
+        self.section_text = discord.ui.TextInput(
+            label="Texto junto al botón",
+            placeholder="### 📩 ¿Te interesa?\n\nAbre un ticket para recibir más información.",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=300,
+        )
+        self.button_label = discord.ui.TextInput(
+            label="Texto del botón",
+            placeholder="Click aquí",
+            required=True,
+            max_length=80,
+        )
+        self.button_url = discord.ui.TextInput(
+            label="URL del botón",
+            placeholder="https://tu-sitio.com",
+            required=True,
+            max_length=500,
+        )
+        self.button_emoji = discord.ui.TextInput(
+            label="Emoji del botón (opcional)",
+            placeholder="✅ o <:nombre:123456789012345678>",
+            required=False,
+            max_length=100,
+        )
+        for item in (self.section_text, self.button_label, self.button_url, self.button_emoji):
+            self.add_item(item)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if len(self.controls.draft.buttons) >= MAX_BUILDER_BUTTONS:
+            await interaction.response.send_message(
+                f"❌ Solo se permiten {MAX_BUILDER_BUTTONS} botones por publicación.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            url = validate_web_url(str(self.button_url), "El enlace del botón")
+        except ValueError as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            return
+
+        section_text = str(self.section_text).strip()
+        label = str(self.button_label).strip()
+        if not section_text or not label:
+            await interaction.response.send_message(
+                "❌ El texto de la sección y la etiqueta del botón no pueden estar vacíos.",
+                ephemeral=True,
+            )
+            return
+
+        self.controls.draft.buttons.append(
+            EmbedButtonData(
+                section_text=section_text,
+                label=label,
+                url=url or "",
+                emoji=str(self.button_emoji).strip() or None,
+            )
+        )
+        if draft_content_length(self.controls.draft) > 4000:
+            used = draft_content_length(self.controls.draft)
+            self.controls.draft.buttons.pop()
+            await interaction.response.send_message(
+                f"❌ Este botón elevaría el texto a {used}/4000 caracteres. Acorta el texto de la sección.",
+                ephemeral=True,
+            )
+            return
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(self.controls.draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class AddAnnouncementSectionModal(discord.ui.Modal):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        super().__init__(title="Agregar sección separada", timeout=600)
+        self.controls = controls
+        self.section_content = discord.ui.TextInput(
+            label="Contenido de la nueva sección",
+            placeholder="## 🤝 TU DECIDES\nEscribe aquí el siguiente anuncio...",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=2000,
+        )
+        self.add_item(self.section_content)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        draft = self.controls.draft
+        if len(draft.sections) >= MAX_ANNOUNCEMENT_SECTIONS:
+            await interaction.response.send_message(
+                f"❌ Solo se permiten {MAX_ANNOUNCEMENT_SECTIONS} secciones separadas.",
+                ephemeral=True,
+            )
+            return
+
+        content = str(self.section_content).strip()
+        if not content:
+            await interaction.response.send_message(
+                "❌ La sección no puede estar vacía.",
+                ephemeral=True,
+            )
+            return
+
+        draft.sections.append(content)
+        if draft_content_length(draft) > 4000:
+            used = draft_content_length(draft)
+            draft.sections.pop()
+            await interaction.response.send_message(
+                f"❌ Esta sección elevaría el texto a {used}/4000 caracteres. Acórtala e inténtalo de nuevo.",
+                ephemeral=True,
+            )
+            return
+
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class RemoveLastEmbedButton(discord.ui.Button):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        self.controls = controls
+        super().__init__(
+            label="Quitar último botón",
+            emoji="↩️",
+            style=discord.ButtonStyle.danger,
+            row=1,
+            disabled=not controls.draft.buttons,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.controls.draft.buttons:
+            self.controls.draft.buttons.pop()
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(self.controls.draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class ToggleEveryoneButton(discord.ui.Button):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        self.controls = controls
+        super().__init__(row=1)
+        self.refresh()
+
+    def refresh(self):
+        enabled = self.controls.draft.mention_everyone
+        self.label = "@everyone: Sí" if enabled else "@everyone: No"
+        self.emoji = "📣" if enabled else "🔕"
+        self.style = discord.ButtonStyle.success if enabled else discord.ButtonStyle.secondary
+
+    async def callback(self, interaction: discord.Interaction):
+        self.controls.draft.mention_everyone = not self.controls.draft.mention_everyone
+        if draft_content_length(self.controls.draft) > 4000:
+            self.controls.draft.mention_everyone = False
+            await interaction.response.send_message(
+                "❌ No se puede activar @everyone porque el texto ya alcanzó el límite de 4000 caracteres.",
+                ephemeral=True,
+            )
+            return
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(self.controls.draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class ToggleTranslationButton(discord.ui.Button):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        self.controls = controls
+        super().__init__(row=1)
+        self.refresh()
+
+    def refresh(self):
+        enabled = self.controls.draft.translation_enabled
+        self.label = "Traductor: Activo" if enabled else "Traductor: Desactivado"
+        self.emoji = "🌐" if enabled else "🔕"
+        self.style = discord.ButtonStyle.success if enabled else discord.ButtonStyle.secondary
+
+    async def callback(self, interaction: discord.Interaction):
+        self.controls.draft.translation_enabled = not self.controls.draft.translation_enabled
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(self.controls.draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class AddAnnouncementSectionButton(discord.ui.Button):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        self.controls = controls
+        super().__init__(
+            label="Agregar sección",
+            emoji="➕",
+            style=discord.ButtonStyle.primary,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(AddAnnouncementSectionModal(self.controls))
+
+
+class RemoveLastAnnouncementSectionButton(discord.ui.Button):
+    def __init__(self, controls: "EmbedBuilderControls"):
+        self.controls = controls
+        super().__init__(
+            label="Quitar sección",
+            emoji="↩️",
+            style=discord.ButtonStyle.danger,
+            row=1,
+            disabled=not controls.draft.sections,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.controls.draft.sections:
+            self.controls.draft.sections.pop()
+        self.controls.refresh()
+        await interaction.response.edit_message(
+            content=builder_status(self.controls.draft),
+            view=self.controls,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class EmbedBuilderControls(discord.ui.View):
+    def __init__(
+        self,
+        owner_id: int,
+        draft: EmbedDraft,
+        translation_service: FreeGoogleTranslationService,
+    ):
+        super().__init__(timeout=900)
+        self.owner_id = owner_id
+        self.draft = draft
+        self.translation_service = translation_service
+        self.remove_last = RemoveLastEmbedButton(self)
+        self.toggle_everyone = ToggleEveryoneButton(self)
+        self.toggle_translation = ToggleTranslationButton(self)
+        self.add_section = AddAnnouncementSectionButton(self)
+        self.remove_section = RemoveLastAnnouncementSectionButton(self)
+        self.add_item(self.remove_last)
+        self.add_item(self.toggle_everyone)
+        self.add_item(self.toggle_translation)
+        self.add_item(self.add_section)
+        self.add_item(self.remove_section)
+        self.refresh()
+
+    def refresh(self):
+        self.add_button.disabled = len(self.draft.buttons) >= MAX_BUILDER_BUTTONS
+        self.remove_last.disabled = not self.draft.buttons
+        self.toggle_everyone.refresh()
+        self.toggle_translation.refresh()
+        self.add_section.disabled = len(self.draft.sections) >= MAX_ANNOUNCEMENT_SECTIONS
+        self.remove_section.disabled = not self.draft.sections
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        is_owner = interaction.user.id == self.owner_id
+        is_admin = isinstance(interaction.user, discord.Member) and interaction.user.guild_permissions.administrator
+        if not is_owner or not is_admin:
+            await interaction.response.send_message(
+                "❌ Este creador solo puede usarlo el administrador que lo inició.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+    @discord.ui.button(label="Vista previa", emoji="👁️", style=discord.ButtonStyle.secondary, row=0)
+    async def preview(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            preview = build_components_v2(
+                self.draft,
+                self.translation_service if self.draft.translation_enabled else None,
+                translation_disabled=True,
+            )
+        except (TypeError, ValueError) as error:
+            await interaction.response.send_message(
+                f"❌ No se pudo generar la vista previa. Revisa los emojis y enlaces: {error}",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_message(
+            view=preview,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @discord.ui.button(label="Editar", emoji="✏️", style=discord.ButtonStyle.secondary, row=0)
+    async def edit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            EmbedBasicsModal(self.draft, self.translation_service, self)
+        )
+
+    @discord.ui.button(label="Agregar botón", emoji="🔗", style=discord.ButtonStyle.primary, row=0)
+    async def add_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(AddEmbedButtonModal(self))
+
+    @discord.ui.button(label="Publicar", emoji="✅", style=discord.ButtonStyle.success, row=0)
+    async def publish(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            publication = build_components_v2(
+                self.draft,
+                self.translation_service if self.draft.translation_enabled else None,
+            )
+        except (TypeError, ValueError) as error:
+            await interaction.response.send_message(
+                f"❌ No se pudo generar la publicación. Revisa los emojis y enlaces: {error}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            message = await self.draft.channel.send(
+                view=publication,
+                allowed_mentions=publication_mentions(self.draft),
+            )
+        except discord.HTTPException as error:
+            await interaction.followup.send(
+                f"❌ Discord rechazó la publicación: {error}",
+                ephemeral=True,
+            )
+            return
+
+        if self.draft.translation_enabled:
+            try:
+                self.translation_service.store.save_source(
+                    message.id,
+                    draft_to_data(self.draft),
+                )
+            except Exception:
+                await interaction.followup.send(
+                    "⚠️ La publicación se envió, pero no pude preparar su caché de traducciones.",
+                    ephemeral=True,
+                )
+
+        self.stop()
+        await interaction.edit_original_response(content="✅ Publicación enviada correctamente.", view=None)
+        await interaction.followup.send(
+            f"[Ir a la publicación]({message.jump_url})",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Cancelar", emoji="✖️", style=discord.ButtonStyle.danger, row=0)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(content="🗑️ Creación cancelada.", view=None)
+
 
 class Embeds(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = bot.config
         self.embed_loader = bot.embed_loader
+        translation_config = self.config.get("translation", {})
+        self.translation_service = FreeGoogleTranslationService(
+            database_path=translation_config.get(
+                "database_path",
+                "data/embed_translations.db",
+            )
+        )
+        self.bot.add_view(PersistentTranslationView(self.translation_service))
+
+    @app_commands.command(
+        name="crear-embed",
+        description="Crea una publicación profesional con botones usando un asistente privado",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    async def create_custom_embed(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ Solo los administradores pueden usar este comando.",
+                ephemeral=True,
+            )
+            return
+
+        if not all(
+            hasattr(discord.ui, component)
+            for component in ("LayoutView", "Container", "Section", "TextDisplay", "MediaGallery")
+        ):
+            await interaction.response.send_message(
+                "❌ Este comando requiere discord.py 2.6.4 o superior. Actualiza las dependencias y reinicia el bot.",
+                ephemeral=True,
+            )
+            return
+
+        if interaction.channel is None:
+            await interaction.response.send_message(
+                "❌ No pude identificar el canal de publicación.",
+                ephemeral=True,
+            )
+            return
+
+        draft = EmbedDraft(
+            channel=interaction.channel,
+            color=self.config["bot"]["embed_color"],
+        )
+        await interaction.response.send_modal(
+            EmbedBasicsModal(draft, self.translation_service)
+        )
     
     @app_commands.command(name="auto-response", description="Send an embed based on an option")
     @app_commands.describe(option="Choose an embed option")
