@@ -15,6 +15,11 @@ MAX_BUILDER_BUTTONS = 5
 # Five keeps the full message below Discord's 40-component limit, including
 # thumbnail, banner, five button sections, and the translation selector.
 MAX_ANNOUNCEMENT_SECTIONS = 5
+DEFAULT_BANNER_URL = "https://i.imgur.com/cg47TUW.png"
+DEFAULT_THUMBNAIL_URL = "https://i.imgur.com/p1BgaKk.png"
+DEFAULT_TICKET_BUTTON_URL = (
+    "https://discord.com/channels/1159639252838129704/1159646450704203821"
+)
 
 TRANSLATION_LANGUAGES = (
     ("🇬🇧", "English", "en"),
@@ -54,8 +59,8 @@ class EmbedDraft:
     title: str = ""
     description: str = ""
     color: int = 0x6C02FF
-    banner_url: Optional[str] = None
-    thumbnail_url: Optional[str] = None
+    banner_url: Optional[str] = DEFAULT_BANNER_URL
+    thumbnail_url: Optional[str] = DEFAULT_THUMBNAIL_URL
     mention_everyone: bool = False
     translation_enabled: bool = True
     sections: list[str] = field(default_factory=list)
@@ -410,14 +415,14 @@ class EmbedBasicsModal(discord.ui.Modal):
         )
         self.banner_input = discord.ui.TextInput(
             label="URL del banner inferior",
-            placeholder="https://ejemplo.com/banner.png",
+            placeholder="Borra este campo para publicar sin banner",
             default=draft.banner_url,
             required=False,
             max_length=500,
         )
         self.thumbnail_input = discord.ui.TextInput(
             label="URL del thumbnail lateral",
-            placeholder="https://ejemplo.com/logo.png",
+            placeholder="Borra este campo para publicar sin thumbnail",
             default=draft.thumbnail_url,
             required=False,
             max_length=500,
@@ -512,7 +517,8 @@ class AddEmbedButtonModal(discord.ui.Modal):
         )
         self.button_url = discord.ui.TextInput(
             label="URL del botón",
-            placeholder="https://tu-sitio.com",
+            placeholder="Puedes reemplazar el enlace de tickets",
+            default=DEFAULT_TICKET_BUTTON_URL,
             required=True,
             max_length=500,
         )
