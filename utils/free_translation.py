@@ -99,6 +99,16 @@ class TranslationStore:
             ).fetchone()
         return json.loads(row[0]) if row else None
 
+    def delete_translation(self, message_id: int, language: str):
+        with self._connect() as connection:
+            connection.execute(
+                """
+                DELETE FROM translated_embed_cache
+                WHERE message_id = ? AND language = ?
+                """,
+                (message_id, language),
+            )
+
     def clear_translations(self, message_id: int):
         """Discard cached translations after the source publication is edited."""
         with self._connect() as connection:
@@ -149,6 +159,10 @@ class FreeGoogleTranslationService:
     _protected_pattern = re.compile(
         r"https?://[^\s)>\]]+|<a?:[A-Za-z0-9_~]+:\d+>|<(?:@!?|@&|#)\d+>|</[^:>]+:\d+>"
     )
+    _html_error_pattern = re.compile(
+        r"<!doctype\s+html|<html(?:\s|>)|<title>\s*(?:error|server error)",
+        re.IGNORECASE,
+    )
 
     def __init__(self, database_path: str = "data/embed_translations.db"):
         self.store = TranslationStore(database_path)
@@ -192,8 +206,66 @@ class FreeGoogleTranslationService:
             text = placeholder.sub(lambda _: value, text)
         return text
 
+    @classmethod
+    def is_error_response(cls, text: str) -> bool:
+        """Detect Google error pages returned by deep-translator as plain text."""
+        if not text:
+            return False
+        if cls._html_error_pattern.search(text):
+            return True
+
+        normalized = " ".join(text.casefold().replace("’", "'").split())
+        status_error = any(
+            marker in normalized
+            for marker in (
+                "error 429",
+                "error 500",
+                "error 502",
+                "error 503",
+                "error 504",
+                "429 (too many requests)",
+                "500 (server error)",
+                "502 (server error)",
+                "503 (server error)",
+                "504 (server error)",
+            )
+        )
+        google_error_copy = (
+            "that's an error" in normalized
+            or "that's all we know" in normalized
+            or "our systems have detected unusual traffic" in normalized
+        )
+        return status_error and google_error_copy
+
+    @classmethod
+    def contains_error_payload(cls, value) -> bool:
+        """Inspect cached draft data for an error page saved by an older version."""
+        if isinstance(value, str):
+            return cls.is_error_response(value)
+        if isinstance(value, dict):
+            return any(cls.contains_error_payload(item) for item in value.values())
+        if isinstance(value, (list, tuple)):
+            return any(cls.contains_error_payload(item) for item in value)
+        return False
+
+    def _translate_piece(self, text: str, target: str) -> str:
+        last_error: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                translated = GoogleTranslator(source="auto", target=target).translate(text)
+                if translated and not self.is_error_response(translated):
+                    return translated
+            except Exception as error:
+                last_error = error
+
+            if attempt < 2:
+                time.sleep(0.75 * (attempt + 1))
+
+        raise TranslationError(
+            "El traductor gratuito recibió un error temporal de Google. Inténtalo nuevamente en unos minutos."
+        ) from last_error
+
     def _translate_sync(self, texts: Iterable[str], target: str) -> list[str]:
-        translator = GoogleTranslator(source="auto", target=target)
         values = list(texts)
         results: list[str] = []
         for index, original in enumerate(values):
@@ -201,13 +273,8 @@ class FreeGoogleTranslationService:
                 results.append(original)
                 continue
             protected_text, tokens = self._protect(original)
-            try:
-                translated = translator.translate(protected_text)
-            except Exception as error:
-                raise TranslationError(
-                    "El traductor gratuito está temporalmente limitado. Inténtalo nuevamente en unos minutos."
-                ) from error
-            results.append(self._restore(translated or original, tokens))
+            translated = self._translate_piece(protected_text, target)
+            results.append(self._restore(translated, tokens))
             if index < len(values) - 1:
                 time.sleep(0.25)
         return results

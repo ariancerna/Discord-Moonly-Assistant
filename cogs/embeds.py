@@ -298,6 +298,12 @@ class TranslationSelect(discord.ui.Select):
             translated_data = self.translation_service.store.get_translation(
                 message_id, language
             )
+            if (
+                translated_data is not None
+                and self.translation_service.contains_error_payload(translated_data)
+            ):
+                self.translation_service.store.delete_translation(message_id, language)
+                translated_data = None
             if translated_data is None:
                 retry_after = self.translation_service.translation_retry_after(
                     interaction.user.id
